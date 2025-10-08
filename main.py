@@ -1,15 +1,17 @@
 import io
 import logging
+import os
 import re
 from functools import wraps
 from random import uniform
 from time import sleep
-from typing import Callable, Optional
+from typing import Callable, Any
 
-import easyocr
+import easyocr  # type: ignore
 import pyautogui
-import pytesseract
+import pytesseract  # type: ignore
 import resend
+from dotenv import load_dotenv
 from PIL import Image
 from selenium import webdriver
 from selenium.common.exceptions import TimeoutException, NoSuchElementException
@@ -17,6 +19,10 @@ from selenium.webdriver import Keys
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.remote.webelement import WebElement
+
+# Load environment variables
+load_dotenv()
 
 # --- Logging Setup ---
 log_formatter = logging.Formatter(
@@ -39,9 +45,9 @@ CROPPED_IMAGE_BOX = (724, 139, 1205, 215)  # (left, upper, right, lower)
 
 
 # --- Decorators ---
-def log_function_call(func: Callable) -> Callable:
+def log_function_call(func: Callable[..., Any]) -> Callable[..., Any]:
     @wraps(func)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         logger.debug(f"Entering function: {func.__name__}")
         try:
             result = func(self, *args, **kwargs)
@@ -59,17 +65,17 @@ class SparxTTWorkflow:
     def __init__(self) -> None:
         logger.debug("Initializing SparxTTWorkflow...")
         self.driver: webdriver.Firefox = webdriver.Firefox()
-        self.wait: WebDriverWait = WebDriverWait(self.driver, 10)
+        self.wait: WebDriverWait[webdriver.Firefox] = WebDriverWait(self.driver, 10)
         logger.debug("Web driver initialized and WebDriverWait set.")
 
         # School Selection
         self.school_url: str = "https://selectschool.sparxmaths.uk/?forget=1"
-        self.school_text: str = "The Calder Learning Trust"
+        self.school_text: str = os.getenv("SCHOOL_TEXT", "")
         self.school_input_class_name: str = "_Input_14i1t_4"
 
         # Login
-        self.username_text: str = "KaidenSmith"
-        self.password_text: str = "Floppy_706"
+        self.username_text: str = os.getenv("USERNAME", "")
+        self.password_text: str = os.getenv("PASSWORD", "")
         self.username_id: str = "username"
         self.password_id: str = "password"
         self.login_button_class_name: str = "sm-button login-button"
@@ -81,7 +87,7 @@ class SparxTTWorkflow:
         )
         self.times_tables_text_xpath: str = "//span[contains(text(), 'Times Tables')]"
         self.club_check_text_xpath: str = (
-            "//div[contains(@class, '_Content_nt2r3_194') and text()='100 Club Check']"
+            "//div[contains(@class, '_Content_nt2r3_194') and text()='100 Club Check']"
         )
         self.times_tables_exit_xpath: str = (
             "//a[contains(@class, '_BackButton_1iso5_1')]"
@@ -106,7 +112,7 @@ class SparxTTWorkflow:
             logger.info("Workflow run completed, cleanup executed.")
 
     @log_function_call
-    def execute_step(self, step_func: Callable) -> None:
+    def execute_step(self, step_func: Callable[[], None]) -> None:
         try:
             step_func()
         except (TimeoutException, NoSuchElementException) as e:
@@ -177,9 +183,17 @@ class SparxTTWorkflow:
             cropped_image.save(cropped_image_bytes, format="PNG")
             cropped_image_bytes.seek(0)
 
-            extracted_text = reader.readtext(
+            extracted_text_result = reader.readtext(
                 cropped_image_bytes.getvalue(), detail=0, paragraph=True
             )
+            
+            # Handle the different possible return types from EasyOCR
+            if isinstance(extracted_text_result, list):
+                # Convert all elements to strings to ensure compatibility with join
+                extracted_text = [str(item) for item in extracted_text_result]
+            else:
+                extracted_text = [str(extracted_text_result)]
+            
             match = pattern.search(" ".join(extracted_text))
 
             if successful_attempts % 10 == 0:
@@ -208,11 +222,11 @@ class SparxTTWorkflow:
     @log_function_call
     def wait_for_element(
         self, by: By, value: str, clickable: bool = False
-    ) -> Optional[webdriver.remote]:
+    ) -> WebElement:
         condition = (
-            EC.element_to_be_clickable((by, value))
+            EC.element_to_be_clickable((by.value, value))
             if clickable
-            else EC.presence_of_element_located((by, value))
+            else EC.presence_of_element_located((by.value, value))
         )
         return self.wait.until(condition)
 
@@ -225,11 +239,12 @@ class SparxTTWorkflow:
             except Exception as e:
                 logger.error(f"Error during cleanup: {e}", exc_info=True)
             finally:
-                resend.api_key = "re_6gpTkG2f_MJS8MiNn8Jqbz2U21ycJJxUG"
+                resend.api_key = os.getenv("RESEND_API_KEY", "")
+                resend_to = os.getenv("RESEND_TO", "")
                 resend.Emails.send(
                     {
                         "from": "SparxTT-Solver@resend.dev",
-                        "to": "kdntninja-2010@proton.me",
+                        "to": resend_to,
                         "subject": "SparxTT-Solver Finished",
                         "html": "<p>SparxTT-Solver Run <strong>Finished</strong>!</p><pre>"
                         + "".join(reversed(open("workflow_log.txt", "r").readlines()))
