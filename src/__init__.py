@@ -1,0 +1,1 @@
+"""SparxMathsBot package."""
