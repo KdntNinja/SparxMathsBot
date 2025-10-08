@@ -6,8 +6,10 @@ from .logger_setup import setup_logger
 
 logger = setup_logger()
 
+
 def log_function_call(func: Callable[..., Any]) -> Callable[..., Any]:
     """Decorator to log function entry and exit with error handling."""
+
     @wraps(func)
     def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         logger.debug(f"Entering function: {func.__name__}")

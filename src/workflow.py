@@ -24,6 +24,7 @@ from .logger_setup import setup_logger
 
 logger = setup_logger()
 
+
 class SparxTTWorkflow:
     def __init__(self) -> None:
         logger.debug("Initializing SparxTTWorkflow...")
@@ -60,9 +61,7 @@ class SparxTTWorkflow:
     def select_school(self) -> None:
         logger.debug(f"Opening school URL: {SCHOOL_URL}")
         self.driver.get(SCHOOL_URL)
-        input_element = self.wait_for_element(
-            By.CLASS_NAME, SCHOOL_INPUT_CLASS_NAME
-        )
+        input_element = self.wait_for_element(By.CLASS_NAME, SCHOOL_INPUT_CLASS_NAME)
         input_element.send_keys(SCHOOL_TEXT + Keys.RETURN)
         continue_button = self.wait_for_element(
             By.XPATH, "//button[text()='Continue']", clickable=True
@@ -73,9 +72,7 @@ class SparxTTWorkflow:
     @log_function_call
     def login(self) -> None:
         self.wait_for_element(By.ID, USERNAME_ID).send_keys(USERNAME)
-        self.wait_for_element(By.ID, PASSWORD_ID).send_keys(
-            PASSWORD + Keys.RETURN
-        )
+        self.wait_for_element(By.ID, PASSWORD_ID).send_keys(PASSWORD + Keys.RETURN)
         logger.debug("Login attempted.")
 
     @log_function_call
@@ -83,12 +80,8 @@ class SparxTTWorkflow:
         self.wait_for_element(
             By.CLASS_NAME, HOMEWORK_TEXT_CLASS_NAME, clickable=True
         ).click()
-        self.wait_for_element(
-            By.XPATH, TIMES_TABLES_TEXT_XPATH, clickable=True
-        ).click()
-        self.wait_for_element(
-            By.XPATH, CLUB_CHECK_TEXT_XPATH, clickable=True
-        ).click()
+        self.wait_for_element(By.XPATH, TIMES_TABLES_TEXT_XPATH, clickable=True).click()
+        self.wait_for_element(By.XPATH, CLUB_CHECK_TEXT_XPATH, clickable=True).click()
         sleep(10)
         logger.info("Successfully navigated to Times Tables.")
 
@@ -125,10 +118,10 @@ class SparxTTWorkflow:
             extracted_text_result: List[str] = reader.readtext(
                 cropped_image_bytes.getvalue(), detail=0, paragraph=True
             )
-            
+
             # Convert all text results to strings and join them
             extracted_text: List[str] = [str(item) for item in extracted_text_result]
-            
+
             match = pattern.search(" ".join(extracted_text))
 
             if successful_attempts % 10 == 0:
